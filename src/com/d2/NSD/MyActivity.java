@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import com.d2.NSD.activity.ClientActivity;
@@ -18,9 +17,7 @@ public class MyActivity extends Activity implements View.OnClickListener{
 
 	private Button btn_server;
 	private Button btn_client;
-	/**
-	 * Called when the activity is first created.
-	 */
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);

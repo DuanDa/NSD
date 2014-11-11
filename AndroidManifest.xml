@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.d2.NSD"
-    android:versionCode="1"
+    android:versionCode="2"
     android:versionName="1.0">
 
     <uses-sdk android:minSdkVersion="17" />
@@ -16,6 +16,7 @@
         android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.NSD">
         <activity
+	        android:screenOrientation="portrait"
             android:name="MyActivity"
             android:label="@string/app_name">
             <intent-filter>
@@ -24,7 +25,12 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".activity.ClientActivity" />
-        <activity android:name=".activity.ServerActivity" />
+        <activity
+	        android:screenOrientation="portrait"
+	        android:name=".activity.ClientActivity" />
+
+        <activity
+	        android:configChanges="orientation|screenSize"
+	        android:name=".activity.ServerActivity" />
     </application>
 </manifest>
