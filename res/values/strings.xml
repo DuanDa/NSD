@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+	<integer name="port">2014</integer>
     <string name="app_name">NSD</string>
     <string name="service_name">D2 Camera</string>
+	<string name="server">Server</string>
+	<string name="client">Client</string>
 </resources>
