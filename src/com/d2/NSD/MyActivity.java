@@ -1,10 +1,7 @@
 package com.d2.NSD;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
-import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;

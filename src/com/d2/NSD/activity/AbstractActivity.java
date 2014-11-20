@@ -1,11 +1,11 @@
 package com.d2.NSD.activity;
 
-import android.app.ActionBar;
-import android.app.Activity;
 import android.os.Bundle;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.ActionBarActivity;
 import android.view.MenuItem;
 
-public class AbstractActivity extends Activity {
+public class AbstractActivity extends ActionBarActivity {
 
 	private final String TAG = AbstractActivity.class.getSimpleName();
 
@@ -14,7 +14,7 @@ public class AbstractActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		actionBar = getActionBar();
+		actionBar = getSupportActionBar();
 		if (actionBar != null) {
 			actionBar.setDisplayShowTitleEnabled(true);
 			actionBar.setHomeButtonEnabled(true);

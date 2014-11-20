@@ -13,38 +13,49 @@
 
     <ListView
         android:id="@+id/lv_devices"
-        android:layout_margin="20dp"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+    </ListView>
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_marginBottom="20dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:text="Connection Status:"
+            android:textSize="18sp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/tv_connection_status"
+            android:textSize="18sp"
+            android:textStyle="normal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-    </ListView>
+
+        <ImageView
+            android:id="@+id/iv"
+            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="0dp" />
+
+        <Button
+            android:id="@+id/btn_connect"
+            android:text="Connect"
+            android:layout_gravity="center_horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
 </LinearLayout>
-
-<!--<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
-	<!--android:orientation="vertical"-->
-	<!--android:layout_width="match_parent"-->
-	<!--android:layout_height="match_parent">-->
-
-	<!--<TextView-->
-		<!--android:text="NSD is broadcasting, please wait for connection."-->
-		<!--android:layout_margin="20dp"-->
-		<!--android:layout_width="match_parent"-->
-		<!--android:layout_height="wrap_content" />-->
-
-	<!--<TextView-->
-		<!--android:id="@+id/tv_service_name"-->
-		<!--android:layout_margin="20dp"-->
-		<!--android:layout_width="match_parent"-->
-		<!--android:layout_height="wrap_content" />-->
-
-	<!--<TextView-->
-		<!--android:id="@+id/tv_ip"-->
-		<!--android:layout_margin="20dp"-->
-		<!--android:layout_width="match_parent"-->
-		<!--android:layout_height="wrap_content" />-->
-
-	<!--<FrameLayout-->
-		<!--android:id="@+id/fl_container"-->
-		<!--android:layout_width="match_parent"-->
-		<!--android:layout_height="match_parent">-->
-	<!--</FrameLayout>-->
-<!--</LinearLayout>-->

@@ -1,39 +1,39 @@
 package com.d2.NSD.activity;
 
-import android.content.Context;
-import android.hardware.Camera;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
-import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.text.format.Formatter;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
-import android.widget.ArrayAdapter;
-import android.widget.FrameLayout;
-import android.widget.ListView;
-import android.widget.TextView;
+import android.view.View;
+import android.widget.*;
 import com.d2.NSD.R;
-import com.d2.NSD.view.CameraPreview;
 
 import java.io.*;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 
-public class ClientActivity extends AbstractActivity {
-
+public class ClientActivity extends AbstractActivity implements AdapterView.OnItemClickListener, View.OnClickListener {
 	private final String TAG = ClientActivity.class.getSimpleName();
-
-	private NsdManager nsdManager;
-	private NsdManager.DiscoveryListener discoveryListener;
-	private NsdManager.ResolveListener resolveListener;
+	private final static int CONNECTED = 1;
+	private final static int DISCONNECTED = -1;
 
 	private List<String> devices = new ArrayList<String>();
 
 	private ListView lv_devices;
+	private TextView tv_connection_status;
+	private Button btn_connect;
+	private ImageView iv;
 	private ArrayAdapter<String> adapter;
+	private Handler mHandler;
+	private boolean appClose;
 
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -49,210 +49,264 @@ public class ClientActivity extends AbstractActivity {
 	protected void onResume() {
 		super.onResume();
 		devices.clear();
-		nsdManager.discoverServices("_http._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener);
+
+		//new Thread(new Runnable() {
+		//	@Override
+		//	public void run() {
+		//		sniffDevices();
+		//	}
+		//}).start();
+
+		//sendTestToServer();
+	}
+
+	@Override
+	protected void onStop() {
+		super.onStop();
+
+		appClose = true;
 	}
 
 	private void init() {
+		// init Handler
+		mHandler = new Handler() {
+			@Override
+			public void handleMessage(Message msg) {
+				Bundle data = msg.getData();
+				if (data != null) {
+					//devices.add(data.getString("IP_ADDRESS") + " (" + data.getString("HOST_NAME") + ")");
+					//adapter.notifyDataSetChanged();
+
+					if (msg.what == CONNECTED) {
+						tv_connection_status.setText(String.format("%s is connected", data.getString("IP_ADDRESS")));
+						tv_connection_status.setTextColor(Color.GREEN);
+					}
+					else if (msg.what == DISCONNECTED) {
+						tv_connection_status.setText("Connection failed");
+						tv_connection_status.setTextColor(Color.RED);
+					}
+
+					byte[] bytes = data.getByteArray("BYTE");
+					if (bytes != null) {
+						Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+						iv.setImageBitmap(bitmap);
+					}
+				}
+			}
+		};
+
 		// init ListView adapter
 		adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, devices);
 
 		// init UI resources
 		lv_devices = (ListView) findViewById(R.id.lv_devices);
+		lv_devices.setOnItemClickListener(this);
 		lv_devices.setAdapter(adapter);
+		findViewById(R.id.btn_connect).setOnClickListener(this);
+		iv = (ImageView) findViewById(R.id.iv);
+		tv_connection_status = (TextView) findViewById(R.id.tv_connection_status);
+	}
 
-		// init NsdManager
-		nsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
-
-		// init ResolverListener
-		resolveListener = new NsdManager.ResolveListener() {
-			@Override
-			public void onResolveFailed(NsdServiceInfo nsdServiceInfo, int i) {
-				Log.i(TAG, "---> onResolveFailed: " + nsdServiceInfo);
-			}
-
-			@Override
-			public void onServiceResolved(NsdServiceInfo nsdServiceInfo) {
-				Log.i(TAG, "---> onServiceResolved: " + nsdServiceInfo);
-
-				int port = nsdServiceInfo.getPort();
-				InetAddress inetAddress = nsdServiceInfo.getHost();
-				Log.i(TAG, "---> port: " + port + " / ip address: " + inetAddress);
-
-				sendTestToServer(inetAddress, port);
-			}
-		};
-
-		// init DiscoveryListener
-		discoveryListener = new NsdManager.DiscoveryListener() {
-			@Override
-			public void onStartDiscoveryFailed(String s, int i) {
-				Log.i(TAG, "---> onStartDiscoveryFailed: " + s);
-			}
-
-			@Override
-			public void onStopDiscoveryFailed(String s, int i) {
-				Log.i(TAG, "---> onStopDiscoveryFailed: " + s);
-			}
-
-			@Override
-			public void onDiscoveryStarted(String s) {
-				Log.i(TAG, "---> onDiscoveryStarted: " + s);
-			}
-
-			@Override
-			public void onDiscoveryStopped(String s) {
-				Log.i(TAG, "---> onDiscoveryStopped: " + s);
-			}
-
-			@Override
-			public void onServiceFound(NsdServiceInfo nsdServiceInfo) {
-				Log.i(TAG, "---> onServiceFound: " + nsdServiceInfo.getServiceName());
-				devices.add(nsdServiceInfo.getServiceName());
-				adapter.notifyDataSetChanged();
-
-				if (nsdServiceInfo.getServiceName().contains(getString(R.string.service_name))) {
-					nsdManager.resolveService(nsdServiceInfo, resolveListener);
+	private void sniffDevices() {
+		byte[] ip_address = null;
+		Enumeration<NetworkInterface> nets = null;
+		try {
+			nets = NetworkInterface.getNetworkInterfaces();
+			for (NetworkInterface netIf : Collections.list(nets)) {
+				System.out.println("--->");
+				System.out.printf("Display name: %s\n", netIf.getDisplayName());
+				System.out.printf("Name: %s\n", netIf.getName());
+				Enumeration<InetAddress> inetAddresses = netIf.getInetAddresses();
+				while (inetAddresses.hasMoreElements()) {
+					InetAddress inetAddress = inetAddresses.nextElement();
+					byte[] address = inetAddress.getAddress();
+					System.out.println("address: " + inetAddress.getHostAddress());
+					if (address.length == 4) {
+						ip_address = address;
+					}
 				}
 			}
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
 
-			@Override
-			public void onServiceLost(NsdServiceInfo nsdServiceInfo) {
-				Log.i(TAG, "---> onServiceLost: " + nsdServiceInfo.getServiceName());
+		for (int i = 1; i <= 254; i++) {
+			ip_address[3] = (byte) i;
+			InetAddress byAddress = null;
+			try {
+				byAddress = InetAddress.getByAddress(ip_address);
+				if (byAddress.isReachable(1000)) {
+					System.out.println("---> ip: " + byAddress.getHostAddress() + " / name: " + byAddress.getHostName());
+					Bundle bundle = new Bundle();
+					bundle.putString("IP_ADDRESS", byAddress.getHostAddress());
+					bundle.putString("HOST_NAME", byAddress.getHostName());
+					Message message = new Message();
+					message.setData(bundle);
+					mHandler.sendMessage(message);
+				}
+			} catch (UnknownHostException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
-		};
+		}
 	}
 
 	private void sendTestToServer(InetAddress inetAddress, int port) {
-		String text = "This text is from client";
+		Log.i(TAG, "---> sendTestToServer");
+		String text = "Client says hello";
+		String line = null;
+		StringBuilder builder = new StringBuilder();
 
 		// 创建一个套接字
 		Socket socket = null;
 		try {
 			// 创建一个套接字并将其指定到Server IP地址
 			socket = new Socket(inetAddress.getHostAddress(), port);
-			socket.setSoTimeout(30000);
+			socket.setSoTimeout(60000);
 
-			// 由Socket对象得到输出流，并构造PrinterWriter对象
-			PrintWriter printWriter = new PrintWriter(socket.getOutputStream(), true);
+			// Get inputstream and outputstream from connected socket
+			OutputStream outputStream = socket.getOutputStream();
+			InputStream inputStream = socket.getInputStream();
 
-			// 将字符串输出到Server
-			BufferedReader bufferedReader = new BufferedReader(new StringReader(text));
-			String line = null;
-			while ((line = bufferedReader.readLine()) != null) {
-				printWriter.println(line);
+			// Show connection status
+
+
+			ServerSocket serverSocket = new ServerSocket(2015);
+			Socket accept = serverSocket.accept();
+			System.out.println("---> client received:");
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(accept.getInputStream()));
+			String result = null;
+			while ((result = bufferedReader.readLine()) != null) {
+				System.out.println("---> client received:" + result);
 			}
 
-			bufferedReader.close();
+			// Get input stream from socket
+			BufferedReader bufferedReaderFromServer = new BufferedReader(new InputStreamReader(inputStream));
+			ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+			//line = null;
+			//StringBuilder stringBuilder = new StringBuilder();
+			//while ((line = bufferedReaderFromServer.readLine()) != null) {
+			//	stringBuilder.append(line);
+			//	Bundle bundle = new Bundle();
+			//	bundle.putString("MESSAGE", stringBuilder.toString());
+			//	Message message = new Message();
+			//	message.setData(bundle);
+			//	mHandler.sendMessage(message);
+			//}
+
+			int count = 1;
+			while (true) {
+				inputStream = socket.getInputStream();
+
+
+
+				if (count++ % 1000 == 0) {
+					Thread.sleep(500);
+					break;
+				}
+			}
+
+			bufferedReaderFromServer.close();
 			socket.close();
 		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
 
-	//private NsdManager.RegistrationListener registrationListener;
-	//private NsdManager nsdManager;
-	//private Camera mCamera;
-	//
-	//private TextView tv_service_name;
-	//private TextView tv_ip;
-	//private FrameLayout fl_container;
-	//
-	//private String serviceName;
-	//private byte[] mBuffer = new byte[1024 * 8];
-	//
-	//@Override
-	//protected void onCreate(Bundle savedInstanceState) {
-	//	super.onCreate(savedInstanceState);
-	//	Log.i(TAG, "---> onCreate");
-	//	setContentView(R.layout.client);
-	//
-	//	// Update in ActionBar
-	//	setTitle(getString(R.string.client));
-	//
-	//	init();
-	//}
-	//
-	//@Override
-	//protected void onResume() {
-	//	super.onResume();
-	//	Log.i(TAG, "---> onResume");
-	//
-	//	tv_service_name.setText(getString(R.string.service_name));
-	//	WifiManager wm = (WifiManager) getSystemService(WIFI_SERVICE);
-	//	String ip = Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
-	//	tv_ip.setText(ip);
-	//
-	//	// Create preview and set camera preview
-	//	CameraPreview cameraPreview = new CameraPreview(this, mCamera);
-	//	fl_container.addView(cameraPreview);
-	//
-	//
-	//}
-	//
-	//@Override
-	//protected void onStop() {
-	//	super.onStop();
-	//
-	//	//release();
-	//}
-	//
-	//private void init() {
-	//	Log.i(TAG, "---> init");
-	//
-	//	initRegistrationListener();
-	//	registerService(NsdManager.PROTOCOL_DNS_SD);
-	//	mCamera = getCameraInstance();
-	//
-	//	tv_service_name = (TextView) findViewById(R.id.tv_service_name);
-	//	tv_ip = (TextView) findViewById(R.id.tv_ip);
-	//	fl_container = (FrameLayout) findViewById(R.id.fl_container);
-	//}
-	//
-	//private void initRegistrationListener() {
-	//	registrationListener = new NsdManager.RegistrationListener() {
-	//		@Override
-	//		public void onRegistrationFailed(NsdServiceInfo nsdServiceInfo, int i) {
-	//			Log.i(TAG, "---> onRegistrationFailed");
-	//		}
-	//
-	//		@Override
-	//		public void onUnregistrationFailed(NsdServiceInfo nsdServiceInfo, int i) {
-	//			Log.i(TAG, "---> onUnregistrationFailed");
-	//		}
-	//
-	//		@Override
-	//		public void onServiceRegistered(NsdServiceInfo nsdServiceInfo) {
-	//			serviceName = nsdServiceInfo.getServiceName();
-	//		}
-	//
-	//		@Override
-	//		public void onServiceUnregistered(NsdServiceInfo nsdServiceInfo) {
-	//			Log.i(TAG, "---> onServiceUnregistered");
-	//		}
-	//	};
-	//}
-	//
-	//private void registerService(int port) {
-	//	NsdServiceInfo nsdServiceInfo = new NsdServiceInfo();
-	//	nsdServiceInfo.setServiceName(getString(R.string.service_name));
-	//	nsdServiceInfo.setServiceType("_http._tcp.");
-	//	nsdServiceInfo.setPort(port);
-	//
-	//	nsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
-	//	nsdManager.registerService(nsdServiceInfo, port, registrationListener);
-	//}
-	//
-	//private Camera getCameraInstance() {
-	//	Camera camera = null;
-	//	camera = Camera.open();
-	//	camera.setDisplayOrientation(90);
-	//	return camera;
-	//}
-	//
-	//private void release() {
-	//	if (mCamera != null) {
-	//		mCamera.stopPreview();
-	//		mCamera.release();
-	//	}
-	//}
+	private void connectServer(InetAddress inetAddress, int port) {
+		while (true) {
+			if (appClose)
+				break;
+
+			try {
+				Log.i(TAG, "---> client connected");
+				Socket socket = new Socket(inetAddress.getHostAddress(), port);
+				socket.setSoTimeout(60000);
+
+				OutputStream outputStream = socket.getOutputStream();
+				InputStream inputStream = socket.getInputStream();
+
+				//Log.i(TAG, "---> client connected");
+				// Connected!
+				Bundle bundle = new Bundle();
+				bundle.putString("IP_ADDRESS", inetAddress.getHostAddress());
+				Message message = new Message();
+				message.what = CONNECTED;
+				message.setData(bundle);
+				mHandler.sendMessage(message);
+
+				// Sending connecting status to server
+				PrintWriter printWriter = new PrintWriter(outputStream, true);
+				printWriter.println("connecting");
+
+				// Receiving resources from server
+				//ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+				//byte[] buffer = new byte[1024];
+				//int length = 0;
+				//while ((length = inputStream.read(buffer, 0, buffer.length)) > 0) {
+				//	byteArrayOutputStream.write(buffer, 0, length);
+				//}
+				//
+				//byteArrayOutputStream.flush();
+				//byte[] data = byteArrayOutputStream.toByteArray();
+				//Log.i(TAG, "---> get data: " + data.length);
+				//bundle = new Bundle();
+				//bundle.putByteArray("BYTE", data);
+				//message = new Message();
+				//message.setData(bundle);
+				//mHandler.sendMessage(message);
+
+				Log.i(TAG, "---> client update image");
+				Thread.sleep(500);
+			} catch (IOException e) {
+				e.printStackTrace();
+
+				// Disconnected!
+				if (mHandler != null)
+					mHandler.sendEmptyMessage(DISCONNECTED);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	@Override
+	public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+		String ip_server = "10.0.11.249";
+		try {
+			final InetAddress inetAddress = InetAddress.getByName(ip_server);
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					sendTestToServer(inetAddress, 2014);
+				}
+			}).start();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void onClick(View view) {
+		int id = view.getId();
+		if (id == R.id.btn_connect) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					String ip_server = "10.0.11.249";
+					try {
+						final InetAddress inetAddress = InetAddress.getByName(ip_server);
+						//sendTestToServer(inetAddress, 2014);
+						connectServer(inetAddress, 2014);
+					} catch (UnknownHostException e) {
+						e.printStackTrace();
+					}
+				}
+			}).start();
+		}
+	}
 }
